@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Ninzy Generator - QRIS Statis ke Dinamis</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    #qrcode img, #qrcode canvas { border-radius: 12px; }
+    .drop-zone.active { border-color: #22c55e; background: rgba(34, 197, 94, 0.1); }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div class="max-w-lg mx-auto px-4 py-6 pb-24">
+    <!-- Header -->
+    <header class="text-center mb-6">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30 mb-3">
+        <i class="fas fa-qrcode text-2xl text-white"></i>
+      </div>
+      <h1 class="text-2xl font-bold tracking-tight">Ninzy Generator</h1>
+      <p class="text-slate-400 text-sm mt-1">Ubah QRIS Statis menjadi Dinamis</p>
+    </header>
+
+    <!-- Step 1: Input QRIS -->
+    <section class="glass rounded-2xl p-5 mb-4 border border-slate-700/50">
+      <h2 class="font-semibold text-sm text-emerald-400 mb-3 flex items-center gap-2">
+        <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold">1</span>
+        Masukkan QRIS Statis
+      </h2>
+
+      <!-- Tabs -->
+      <div class="flex gap-2 mb-3">
+        <button id="tabPaste" onclick="switchTab('paste')" class="flex-1 py-2 px-3 rounded-xl text-sm font-medium bg-emerald-500 text-white transition">
+          <i class="fas fa-paste mr-1"></i> Paste String
+        </button>
+        <button id="tabUpload" onclick="switchTab('upload')" class="flex-1 py-2 px-3 rounded-xl text-sm font-medium bg-slate-700 text-slate-300 transition">
+          <i class="fas fa-image mr-1"></i> Upload Gambar
+        </button>
+      </div>
+
+      <!-- Paste -->
+      <div id="panelPaste">
+        <textarea id="qrisInput" rows="4" placeholder="Tempel string QRIS di sini...&#10;Contoh: 00020101021126..." 
+          class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 resize-none"></textarea>
+      </div>
+
+      <!-- Upload -->
+      <div id="panelUpload" class="hidden">
+        <div id="dropZone" class="drop-zone border-2 border-dashed border-slate-600 rounded-xl p-6 text-center cursor-pointer transition hover:border-emerald-500/50">
+          <input type="file" id="fileInput" accept="image/*" class="hidden" />
+          <i class="fas fa-cloud-upload-alt text-3xl text-slate-500 mb-2"></i>
+          <p class="text-sm text-slate-400">Klik atau tarik gambar QRIS ke sini</p>
+          <p class="text-xs text-slate-500 mt-1">PNG, JPG, WEBP</p>
+        </div>
+        <div id="uploadPreview" class="hidden mt-3 text-center">
+          <img id="previewImg" class="max-h-32 mx-auto rounded-lg border border-slate-600" />
+          <button onclick="clearUpload()" class="mt-2 text-xs text-red-400 hover:text-red-300"><i class="fas fa-times mr-1"></i>Hapus</button>
+        </div>
+      </div>
+
+      <button onclick="parseQRIS()" class="w-full mt-3 bg-slate-700 hover:bg-slate-600 text-white font-medium py-2.5 rounded-xl transition text-sm">
+        <i class="fas fa-search mr-2"></i>Baca QRIS
+      </button>
+    </section>
+
+    <!-- Merchant Info -->
+    <section id="merchantInfo" class="hidden glass rounded-2xl p-5 mb-4 border border-slate-700/50 fade-in">
+      <h2 class="font-semibold text-sm text-emerald-400 mb-3 flex items-center gap-2">
+        <i class="fas fa-store"></i> Info Merchant
+      </h2>
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p class="text-slate-500 text-xs">Nama</p>
+          <p id="infoName" class="font-medium truncate">-</p>
+        </div>
+        <div>
+          <p class="text-slate-500 text-xs">Kota</p>
+          <p id="infoCity" class="font-medium truncate">-</p>
+        </div>
+        <div>
+          <p class="text-slate-500 text-xs">Jenis</p>
+          <p id="infoType" class="font-medium">-</p>
+        </div>
+        <div>
+          <p class="text-slate-500 text-xs">MCC</p>
+          <p id="infoMCC" class="font-medium">-</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 2: Nominal -->
+    <section class="glass rounded-2xl p-5 mb-4 border border-slate-700/50">
+      <h2 class="font-semibold text-sm text-emerald-400 mb-3 flex items-center gap-2">
+        <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold">2</span>
+        Atur Nominal
+      </h2>
+
+      <label class="block text-xs text-slate-400 mb-1">Nominal Pembayaran (Rp)</label>
+      <div class="relative mb-4">
+        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">Rp</span>
+        <input type="text" id="amountInput" inputmode="numeric" placeholder="50.000" 
+          class="w-full bg-slate-900 border border-slate-600 rounded-xl pl-12 pr-4 py-3 text-lg font-semibold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+          oninput="formatAmount(this)" />
+      </div>
+
+      <!-- Fee -->
+      <div class="flex items-center gap-2 mb-2">
+        <input type="checkbox" id="feeToggle" class="w-4 h-4 rounded accent-emerald-500" onchange="toggleFee()" />
+        <label for="feeToggle" class="text-sm text-slate-300">Tambah Biaya Admin</label>
+      </div>
+
+      <div id="feePanel" class="hidden space-y-3">
+        <div class="flex gap-2">
+          <button id="feeFixed" onclick="setFeeType('fixed')" class="flex-1 py-2 rounded-lg text-sm bg-emerald-500 text-white font-medium">Tetap (Rp)</button>
+          <button id="feePercent" onclick="setFeeType('percent')" class="flex-1 py-2 rounded-lg text-sm bg-slate-700 text-slate-300 font-medium">Persen (%)</button>
+        </div>
+        <input type="text" id="feeInput" inputmode="decimal" placeholder="1000 atau 2.5" 
+          class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+      </div>
+    </section>
+
+    <!-- Generate Button -->
+    <button onclick="generateQRIS()" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-semibold py-3.5 rounded-2xl shadow-lg shadow-emerald-500/25 transition active:scale-[0.98] mb-4">
+      <i class="fas fa-magic mr-2"></i>Generate QRIS Dinamis
+    </button>
+
+    <!-- Result -->
+    <section id="resultSection" class="hidden fade-in">
+      <div class="glass rounded-2xl p-5 border border-emerald-500/30">
+        <h2 class="font-semibold text-sm text-emerald-400 mb-4 text-center">
+          <i class="fas fa-check-circle mr-1"></i> QRIS Dinamis Siap
+        </h2>
+
+        <!-- QR Code -->
+        <div class="flex justify-center mb-4">
+          <div id="qrcode" class="bg-white p-3 rounded-2xl shadow-xl"></div>
+        </div>
+
+        <p class="text-center text-xs text-slate-400 mb-3">
+          Nominal: <span id="resultAmount" class="text-emerald-400 font-semibold"></span>
+        </p>
+
+        <!-- String -->
+        <div class="bg-slate-900 rounded-xl p-3 mb-3">
+          <p class="text-xs text-slate-500 mb-1">String QRIS:</p>
+          <p id="resultString" class="text-xs text-slate-300 break-all font-mono leading-relaxed"></p>
+        </div>
+
+        <!-- Actions -->
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="downloadQR()" class="py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm font-medium transition">
+            <i class="fas fa-download mr-1"></i> Unduh PNG
+          </button>
+          <button onclick="copyString()" class="py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm font-medium transition">
+            <i class="fas fa-copy mr-1"></i> Salin String
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <p class="text-center text-xs text-slate-600 mt-8">
+      100% Client-side • Data tidak dikirim ke server<br>
+      Ninzy Generator v1.1
+    </p>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-5 py-2.5 rounded-full text-sm font-medium shadow-xl opacity-0 pointer-events-none transition-opacity duration-300 z-50 border border-slate-600"></div>
+
+  <script>
+    // ========== STATE ==========
+    let staticQRIS = '';
+    let feeType = 'fixed'; // 'fixed' | 'percent'
+    let qrInstance = null;
+
+    // ========== CRC16-CCITT (QRIS Standard) ==========
+    function crc16(str) {
+      let crc = 0xFFFF;
+      for (let i = 0; i < str.length; i++) {
+        crc ^= str.charCodeAt(i) << 8;
+        for (let j = 0; j < 8; j++) {
+          if (crc & 0x8000) {
+            crc = (crc << 1) ^ 0x1021;
+          } else {
+            crc <<= 1;
+          }
+        }
+      }
+      return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+    }
+
+    // ========== PARSE TLV ==========
+    function parseTLV(data) {
+      const result = {};
+      let i = 0;
+      while (i < data.length) {
+        const tag = data.substr(i, 2);
+        const len = parseInt(data.substr(i + 2, 2), 10);
+        const value = data.substr(i + 4, len);
+        result[tag] = value;
+        i += 4 + len;
+      }
+      return result;
+    }
+
+    // ========== FORMAT RUPIAH ==========
+    function formatRupiah(num) {
+      return new Intl.NumberFormat('id-ID').format(num);
+    }
+
+    function formatAmount(el) {
+      let val = el.value.replace(/\D/g, '');
+      if (val) {
+        el.value = formatRupiah(parseInt(val, 10));
+      }
+    }
+
+    function getAmount() {
+      const raw = document.getElementById('amountInput').value.replace(/\D/g, '');
+      return parseInt(raw, 10) || 0;
+    }
+
+    // ========== TABS ==========
+    function switchTab(tab) {
+      const pasteBtn = document.getElementById('tabPaste');
+      const uploadBtn = document.getElementById('tabUpload');
+      const pastePanel = document.getElementById('panelPaste');
+      const uploadPanel = document.getElementById('panelUpload');
+
+      if (tab === 'paste') {
+        pasteBtn.className = 'flex-1 py-2 px-3 rounded-xl text-sm font-medium bg-emerald-500 text-white transition';
+        uploadBtn.className = 'flex-1 py-2 px-3 rounded-xl text-sm font-medium bg-slate-700 text-slate-300 transition';
+        pastePanel.classList.remove('hidden');
+        uploadPanel.classList.add('hidden');
+      } else {
+        uploadBtn.className = 'flex-1 py-2 px-3 rounded-xl text-sm font-medium bg-emerald-500 text-white transition';
+        pasteBtn.className = 'flex-1 py-2 px-3 rounded-xl text-sm font-medium bg-slate-700 text-slate-300 transition';
+        uploadPanel.classList.remove('hidden');
+        pastePanel.classList.add('hidden');
+      }
+    }
+
+    // ========== UPLOAD & SCAN ==========
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('active'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('active');
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) handleFile(fileInput.files[0]);
+    });
+
+    function handleFile(file) {
+      if (!file.type.startsWith('image/')) {
+        showToast('File harus berupa gambar');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          document.getElementById('previewImg').src = e.target.result;
+          document.getElementById('uploadPreview').classList.remove('hidden');
+          document.getElementById('dropZone').classList.add('hidden');
+
+          // Decode QR
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+          if (code && code.data) {
+            document.getElementById('qrisInput').value = code.data;
+            showToast('QRIS berhasil dibaca dari gambar!');
+            parseQRIS();
+          } else {
+            showToast('Tidak ditemukan QR code di gambar');
+          }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearUpload() {
+      document.getElementById('uploadPreview').classList.add('hidden');
+      document.getElementById('dropZone').classList.remove('hidden');
+      document.getElementById('previewImg').src = '';
+      fileInput.value = '';
+    }
+
+    // ========== PARSE QRIS ==========
+    function parseQRIS() {
+      // Only trim the ends (guards against a stray newline/space from
+      // copy-paste). Do NOT strip whitespace from the middle of the string —
+      // QRIS field lengths are computed on the exact original text, and a
+      // merchant name/address containing a space (e.g. "TOKO ABC, Kreatif")
+      // is completely normal. Removing an internal space shortens the value
+      // by one character without updating its length prefix, which shifts
+      // every field after it and corrupts the payload.
+      let raw = document.getElementById('qrisInput').value.trim();
+      if (!raw) {
+        showToast('Masukkan string QRIS terlebih dahulu');
+        return;
+      }
+      if (!raw.startsWith('000201')) {
+        showToast('Format QRIS tidak valid');
+        return;
+      }
+
+      staticQRIS = raw;
+      const tlv = parseTLV(raw);
+
+      // Extract info
+      const name = tlv['59'] || '-';
+      const city = tlv['60'] || '-';
+      const mcc = tlv['52'] || '-';
+      const poi = tlv['01'] || '';
+      const type = poi === '11' ? 'Statis' : (poi === '12' ? 'Dinamis' : 'Tidak diketahui');
+
+      document.getElementById('infoName').textContent = name;
+      document.getElementById('infoCity').textContent = city;
+      document.getElementById('infoType').textContent = type;
+      document.getElementById('infoMCC').textContent = mcc;
+      document.getElementById('merchantInfo').classList.remove('hidden');
+
+      showToast('QRIS berhasil dibaca');
+    }
+
+    // ========== FEE ==========
+    function toggleFee() {
+      const panel = document.getElementById('feePanel');
+      panel.classList.toggle('hidden', !document.getElementById('feeToggle').checked);
+    }
+
+    function setFeeType(type) {
+      feeType = type;
+      const fixedBtn = document.getElementById('feeFixed');
+      const percentBtn = document.getElementById('feePercent');
+      if (type === 'fixed') {
+        fixedBtn.className = 'flex-1 py-2 rounded-lg text-sm bg-emerald-500 text-white font-medium';
+        percentBtn.className = 'flex-1 py-2 rounded-lg text-sm bg-slate-700 text-slate-300 font-medium';
+        document.getElementById('feeInput').placeholder = 'Contoh: 1000';
+      } else {
+        percentBtn.className = 'flex-1 py-2 rounded-lg text-sm bg-emerald-500 text-white font-medium';
+        fixedBtn.className = 'flex-1 py-2 rounded-lg text-sm bg-slate-700 text-slate-300 font-medium';
+        document.getElementById('feeInput').placeholder = 'Contoh: 2.5';
+      }
+    }
+
+    // ========== CONVERT STATIC → DYNAMIC ==========
+    // TLV-aware helpers (build/parse fields by declared length, never by blind
+    // text search). This matters because the old version used string.replace()
+    // with regex over the raw payload: any merchant category code, PAN, or other
+    // field that happened to *contain* the digits "54"/"55"/"56"/"57" anywhere
+    // in its value (e.g. MCC 5411 - a very common "grocery store" code) could
+    // get partially deleted along with unrelated neighboring fields.
+    function buildTLV(tag, value) {
+      return tag + String(value.length).padStart(2, '0') + value;
+    }
+
+    function parseTLVOrdered(data) {
+      const list = [];
+      let i = 0;
+      while (i < data.length) {
+        const tag = data.substr(i, 2);
+        const lenStr = data.substr(i + 2, 2);
+        const len = parseInt(lenStr, 10);
+        if (!/^\d{2}$/.test(lenStr) || isNaN(len)) {
+          throw new Error('Format QRIS rusak (posisi ' + i + ')');
+        }
+        const value = data.substr(i + 4, len);
+        if (value.length !== len) {
+          throw new Error('Panjang data tidak sesuai pada tag ' + tag);
+        }
+        list.push({ tag, value, raw: tag + lenStr + value });
+        i += 4 + len;
+      }
+      return list;
+    }
+
+    function convertToDynamic(qris, amount, fee = null) {
+      // The CRC field (tag 63) is fixed-length per spec: tag(2) + len(2) "04" +
+      // value(4) = 8 chars total. Strip all 8, not just the 4-char value —
+      // otherwise "6304" (tag+length) stays glued to the end and gets
+      // duplicated when the new CRC is appended, corrupting every output.
+      if (qris.slice(-8, -4) !== '6304') {
+        throw new Error('CRC QRIS tidak ditemukan, format tidak valid');
+      }
+      const body = qris.slice(0, -8);
+      let fields = parseTLVOrdered(body);
+
+      // Point of Initiation Method: 11 (static) → 12 (dynamic)
+      fields = fields.map(f => f.tag === '01' ? { tag: '01', value: '12', raw: buildTLV('01', '12') } : f);
+
+      // Drop any pre-existing amount (54) / fee (55, 56, 57) tags — exact tag
+      // match only, so unrelated fields are never touched.
+      fields = fields.filter(f => !['54', '55', '56', '57'].includes(f.tag));
+
+      // Build new amount tag (54)
+      const tag54 = buildTLV('54', String(amount));
+
+      // Build fee tags if requested
+      let feeRaw = '';
+      if (fee && fee.value > 0) {
+        feeRaw = fee.type === 'fixed'
+          ? buildTLV('55', '02') + buildTLV('56', String(fee.value))   // 55 = fixed fee indicator, 56 = fixed fee value
+          : buildTLV('55', '03') + buildTLV('57', String(fee.value));  // 55 = percentage indicator, 57 = percentage value
+      }
+
+      // Insert amount + fee right before Country Code (58), falling back to
+      // Merchant Name (59), by array position — not by searching for the
+      // literal text, which could misfire if a merchant name happened to
+      // contain a similar-looking substring.
+      let insertAt = fields.findIndex(f => f.tag === '58');
+      if (insertAt === -1) insertAt = fields.findIndex(f => f.tag === '59');
+      if (insertAt === -1) insertAt = fields.length;
+
+      const serialized =
+        fields.slice(0, insertAt).map(f => f.raw).join('') +
+        tag54 + feeRaw +
+        fields.slice(insertAt).map(f => f.raw).join('');
+
+      // Calculate new CRC
+      const crc = crc16(serialized + '6304');
+      return serialized + '6304' + crc;
+    }
+
+    // ========== GENERATE ==========
+    function generateQRIS() {
+      if (!staticQRIS) {
+        // Try auto-parse (same rule as parseQRIS: trim ends only, keep any
+        // internal spaces intact so field lengths stay correct)
+        const raw = document.getElementById('qrisInput').value.trim();
+        if (raw && raw.startsWith('000201')) {
+          staticQRIS = raw;
+        } else {
+          showToast('Baca QRIS statis terlebih dahulu');
+          return;
+        }
+      }
+
+      const amount = getAmount();
+      if (!amount || amount <= 0) {
+        showToast('Masukkan nominal yang valid');
+        return;
+      }
+      if (amount > 10000000) {
+        showToast('Maksimal transaksi QRIS Rp 10.000.000');
+        return;
+      }
+
+      let fee = null;
+      if (document.getElementById('feeToggle').checked) {
+        const feeVal = parseFloat(document.getElementById('feeInput').value.replace(',', '.'));
+        if (feeVal > 0) {
+          fee = { type: feeType, value: feeVal };
+        }
+      }
+
+      try {
+        const dynamic = convertToDynamic(staticQRIS, amount, fee);
+
+        // Validate CRC
+        const checkCrc = crc16(dynamic.slice(0, -4));
+        if (checkCrc !== dynamic.slice(-4)) {
+          showToast('Gagal generate CRC, coba lagi');
+          return;
+        }
+
+        // Show result
+        document.getElementById('resultString').textContent = dynamic;
+        document.getElementById('resultAmount').textContent = 'Rp ' + formatRupiah(amount) + (fee ? ' + biaya' : '');
+        document.getElementById('resultSection').classList.remove('hidden');
+
+        // Generate QR Code
+        const qrContainer = document.getElementById('qrcode');
+        qrContainer.innerHTML = '';
+        qrInstance = new QRCode(qrContainer, {
+          text: dynamic,
+          width: 220,
+          height: 220,
+          colorDark: '#000000',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M
+        });
+
+        // Scroll to result
+        document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showToast('QRIS dinamis berhasil dibuat!');
+      } catch (err) {
+        console.error(err);
+        showToast('Gagal generate QRIS: ' + err.message);
+      }
+    }
+
+    // ========== DOWNLOAD & COPY ==========
+    function downloadQR() {
+      const canvas = document.querySelector('#qrcode canvas');
+      const img = document.querySelector('#qrcode img');
+      let dataUrl = '';
+      if (canvas) {
+        dataUrl = canvas.toDataURL('image/png');
+      } else if (img) {
+        dataUrl = img.src;
+      }
+      if (!dataUrl) {
+        showToast('QR Code belum tersedia');
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'ninzy-qris-' + getAmount() + '.png';
+      a.click();
+      showToast('QR Code berhasil diunduh');
+    }
+
+    function copyString() {
+      const str = document.getElementById('resultString').textContent;
+      if (!str) return;
+      navigator.clipboard.writeText(str).then(() => {
+        showToast('String QRIS disalin!');
+      }).catch(() => {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = str;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('String QRIS disalin!');
+      });
+    }
+
+    // ========== TOAST ==========
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('opacity-0');
+      t.classList.add('opacity-100');
+      setTimeout(() => {
+        t.classList.remove('opacity-100');
+        t.classList.add('opacity-0');
+      }, 2500);
+    }
+  </script>
+</body>
+</html>
