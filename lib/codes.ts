@@ -25,4 +25,4 @@ export function isValidUrl(value: string): boolean {
   } catch {
     return false;
   }
-      }
+}
