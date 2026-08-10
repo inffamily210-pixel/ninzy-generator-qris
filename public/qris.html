@@ -417,18 +417,23 @@
       // match only, so unrelated fields are never touched.
       fields = fields.filter(f => !['54', '55', '56', '57'].includes(f.tag));
 
-      // Build new amount tag (54)
-      const tag54 = buildTLV('54', String(amount));
-
-      // Build fee tags if requested
-      let feeRaw = '';
+      // Convenience-fee tags (55/56/57) are part of the EMVCo spec, but in
+      // practice almost no Indonesian QRIS-scanning app (GoPay, OVO, DANA,
+      // mobile banking, etc.) reads or applies them — they only charge
+      // whatever is in tag 54. So instead of relying on 55/56/57, the fee is
+      // folded directly into tag 54 to guarantee the scanned amount actually
+      // includes it.
+      let total = amount;
       if (fee && fee.value > 0) {
-        feeRaw = fee.type === 'fixed'
-          ? buildTLV('55', '02') + buildTLV('56', String(fee.value))   // 55 = fixed fee indicator, 56 = fixed fee value
-          : buildTLV('55', '03') + buildTLV('57', String(fee.value));  // 55 = percentage indicator, 57 = percentage value
+        total = fee.type === 'fixed'
+          ? amount + Math.round(fee.value)
+          : amount + Math.round(amount * (fee.value / 100));
       }
 
-      // Insert amount + fee right before Country Code (58), falling back to
+      // Build new amount tag (54) — total already includes the admin fee.
+      const tag54 = buildTLV('54', String(total));
+
+      // Insert amount right before Country Code (58), falling back to
       // Merchant Name (59), by array position — not by searching for the
       // literal text, which could misfire if a merchant name happened to
       // contain a similar-looking substring.
@@ -438,7 +443,7 @@
 
       const serialized =
         fields.slice(0, insertAt).map(f => f.raw).join('') +
-        tag54 + feeRaw +
+        tag54 +
         fields.slice(insertAt).map(f => f.raw).join('');
 
       // Calculate new CRC
@@ -488,9 +493,18 @@
           return;
         }
 
-        // Show result
+        // Show result. Mirrors the same fee math as convertToDynamic() so
+        // the displayed total matches exactly what gets charged when scanned.
+        let totalCharged = amount;
+        if (fee && fee.value > 0) {
+          totalCharged = fee.type === 'fixed'
+            ? amount + Math.round(fee.value)
+            : amount + Math.round(amount * (fee.value / 100));
+        }
         document.getElementById('resultString').textContent = dynamic;
-        document.getElementById('resultAmount').textContent = 'Rp ' + formatRupiah(amount) + (fee ? ' + biaya' : '');
+        document.getElementById('resultAmount').textContent = fee
+          ? 'Rp ' + formatRupiah(totalCharged) + ' (nominal Rp ' + formatRupiah(amount) + ' + biaya admin)'
+          : 'Rp ' + formatRupiah(amount);
         document.getElementById('resultSection').classList.remove('hidden');
 
         // Generate QR Code
